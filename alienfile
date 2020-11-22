@@ -1,0 +1,48 @@
+use alienfile;
+use strict;
+use Config;
+
+plugin 'Probe::CBuilder' => (
+  libs    => '-lsnappy',
+  lang    => 'C++', # to include snappy-stubs-public.h
+  version => qr/version = 'version = [0-9\.]+'/,
+  program => <<'EO_SNAPPY_VERSION'
+#include <stdio.h>
+#include <snappy-c.h>
+#include <snappy-stubs-public.h>
+
+int main() {
+    printf("version = '%d.%d.%d', link_ok='%d'\n", SNAPPY_MAJOR, SNAPPY_MINOR, SNAPPY_PATCHLEVEL, snappy_max_compressed_length(1));
+    return 0;
+}
+EO_SNAPPY_VERSION
+);
+
+share {
+    plugin Download => (
+        url     => 'https://github.com/google/snappy/archive/1.1.8.tar.gz',
+        version => qr</([0-9\.]+)\.tar\.gz$>,
+    );
+
+    plugin Extract => 'tar.gz';
+
+    plugin 'Build::CMake' => ();
+    build [
+        [
+            '%{cmake}', '.',
+                '-DSNAPPY_BUILD_TESTS=OFF', # otherwise it requires a bunch of libraries
+                @{ meta->prop->{plugin_build_cmake}->{args} },
+                '%{.install.extract}',
+        ],
+        '%{make}',
+        '%{make} install',
+    ];
+
+  gather sub {
+    my ($build) = @_;
+    my $prefix = $build->runtime_prop->{prefix};
+    $build->runtime_prop->{cflags}      ||= "-I$prefix/include ";
+    $build->runtime_prop->{libs}        ||= "-L$prefix/lib -snappy";
+    $build->runtime_prop->{libs_static} ||= "$prefix/lib/libsnappy$Config{lib_ext}",
+  };
+}
