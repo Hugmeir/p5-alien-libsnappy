@@ -19,9 +19,17 @@ EO_SNAPPY_VERSION
 );
 
 share {
-    plugin Download => (
-        url     => 'https://github.com/google/snappy/archive/1.1.8.tar.gz',
-        version => qr</([0-9\.]+)\.tar\.gz$>,
+    # The tarball from the 1.1.8 release and the 1.1.8 tag produce different
+    # libraries -- and from some preliminary testing, the tarball version isn't
+    # compatible with most existing uses(?!).
+    # Could be the bug github bug that's been biting me with libgraphqlparser,
+    # where they sometimes serve the wrong binaries.  Still, the tag never lies,
+    # so download that:
+    plugin 'Download::GitHub' => (
+        github_user => 'google',
+        github_repo => 'snappy',
+        tags_only   => 1,
+        prefer      => '1.1.8',
     );
 
     plugin Extract => 'tar.gz';
@@ -30,6 +38,17 @@ share {
     build [
         [
             '%{cmake}', '.',
+                '-DBUILD_SHARED_LIBS=OFF',
+                '-DSNAPPY_BUILD_TESTS=OFF', # otherwise it requires a bunch of libraries
+                @{ meta->prop->{plugin_build_cmake}->{args} },
+                '%{.install.extract}',
+        ],
+        '%{make}',
+        '%{make} install',
+        '%{make} clean',
+        [
+            '%{cmake}', '.',
+                '-DBUILD_SHARED_LIBS=ON',
                 '-DSNAPPY_BUILD_TESTS=OFF', # otherwise it requires a bunch of libraries
                 @{ meta->prop->{plugin_build_cmake}->{args} },
                 '%{.install.extract}',
@@ -38,11 +57,11 @@ share {
         '%{make} install',
     ];
 
-  gather sub {
-    my ($build) = @_;
-    my $prefix = $build->runtime_prop->{prefix};
-    $build->runtime_prop->{cflags}      ||= "-I$prefix/include ";
-    $build->runtime_prop->{libs}        ||= "-L$prefix/lib -snappy";
-    $build->runtime_prop->{libs_static} ||= "$prefix/lib/libsnappy$Config{lib_ext}",
-  };
+    gather sub {
+        my ($build) = @_;
+        my $prefix = $build->runtime_prop->{prefix};
+        $build->runtime_prop->{cflags}      ||= "-I$prefix/include ";
+        $build->runtime_prop->{libs}        ||= "-L$prefix/lib -lsnappy";
+        $build->runtime_prop->{libs_static} ||= "$prefix/lib/libsnappy$Config{lib_ext}",
+    };
 }
