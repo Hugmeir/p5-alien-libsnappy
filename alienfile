@@ -39,23 +39,27 @@ share {
     ];
 
     plugin 'Build::CMake' => ();
+    my @cmake_args = (
+        '-DSNAPPY_BUILD_TESTS=OFF', # otherwise it requires a bunch of libraries
+        '-DCMAKE_CXX_STANDARD=11',
+        '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
+        '-DCMAKE_CXX_EXTENSIONS=NO',
+        @{ meta->prop->{plugin_build_cmake}->{args} },
+        '%{.install.extract}',
+    );
     build [
         [
             '%{cmake}', '.',
                 '-DBUILD_SHARED_LIBS=OFF',
-                '-DSNAPPY_BUILD_TESTS=OFF', # otherwise it requires a bunch of libraries
-                @{ meta->prop->{plugin_build_cmake}->{args} },
-                '%{.install.extract}',
+                @cmake_args,
         ],
-        '%{make}',
+        '%{make} VERBOSE=1',
         '%{make} install',
         '%{make} clean',
         [
             '%{cmake}', '.',
                 '-DBUILD_SHARED_LIBS=ON',
-                '-DSNAPPY_BUILD_TESTS=OFF', # otherwise it requires a bunch of libraries
-                @{ meta->prop->{plugin_build_cmake}->{args} },
-                '%{.install.extract}',
+                @cmake_args,
         ],
         '%{make}',
         '%{make} install',
@@ -64,8 +68,8 @@ share {
     gather sub {
         my ($build) = @_;
         my $prefix = $build->runtime_prop->{prefix};
-        $build->runtime_prop->{cflags}      ||= "-I$prefix/include ";
-        $build->runtime_prop->{libs}        ||= "-L$prefix/lib -lsnappy";
-        $build->runtime_prop->{libs_static} ||= "$prefix/lib/libsnappy$Config{lib_ext}",
+        $build->runtime_prop->{cflags}      ||= " -I$prefix/include ";
+        $build->runtime_prop->{libs}        ||= " -L$prefix/lib -lsnappy ";
+        $build->runtime_prop->{libs_static} ||= " -L$prefix/lib -lsnappy -stdlib=libc++ ",
     };
 }
