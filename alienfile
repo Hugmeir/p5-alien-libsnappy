@@ -34,6 +34,10 @@ share {
 
     plugin Extract => 'tar.gz';
 
+    patch [
+        '%{patch} -p1 < %{.install.patch}/0001-fPIC-for-the-static-library.patch',
+    ];
+
     plugin 'Build::CMake' => ();
     build [
         [
